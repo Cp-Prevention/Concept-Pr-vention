@@ -1,7 +1,7 @@
 class PresentationSlider {
   constructor() {
     this.currentSlide = 1
-    this.totalSlides = 6
+    this.totalSlides = 9
     this.isAnimating = false
 
     this.init()
@@ -11,6 +11,7 @@ class PresentationSlider {
     this.bindEvents()
     this.updateUI()
     this.addRippleEffects()
+    this.initAnimations()
   }
 
   bindEvents() {
@@ -21,6 +22,16 @@ class PresentationSlider {
     // Slide indicators
     document.querySelectorAll(".indicator").forEach((indicator, index) => {
       indicator.addEventListener("click", () => this.goToSlide(index + 1))
+    })
+
+    // Sommaire navigation - NOUVEAU SÉLECTEUR
+    document.querySelectorAll(".sommaire-item-vertical").forEach((item) => {
+      item.addEventListener("click", () => {
+        const targetSlide = item.getAttribute("data-slide-target")
+        if (targetSlide) {
+          this.goToSlide(Number.parseInt(targetSlide))
+        }
+      })
     })
 
     // Keyboard navigation - SEULEMENT pour navigation horizontale
@@ -34,7 +45,7 @@ class PresentationSlider {
         e.preventDefault()
         this.nextSlide()
       }
-      if (e.key >= "1" && e.key <= "6") {
+      if (e.key >= "1" && e.key <= "9") {
         e.preventDefault()
         this.goToSlide(Number.parseInt(e.key))
       }
@@ -79,7 +90,7 @@ class PresentationSlider {
         if (!startX || !startY) return
 
         const currentX = e.touches[0].clientX
-        const currentY = e.touches[0].clientY
+        const currentY = e.touches[0].currentY
 
         const deltaX = Math.abs(currentX - startX)
         const deltaY = Math.abs(currentY - startY)
@@ -193,11 +204,26 @@ class PresentationSlider {
     })
   }
 
+  // NOUVELLE MÉTHODE : Initialisation des animations
+  initAnimations() {
+    // Appliquer les délais d'animation aux éléments de liste
+    document.querySelectorAll(".slide").forEach((slide) => {
+      const listItems = slide.querySelectorAll(".list-item-animate")
+      listItems.forEach((item, index) => {
+        item.style.animationDelay = `${0.5 + index * 0.1}s`
+      })
+    })
+  }
+
   animateSlideContent(slide) {
     const icon = slide.querySelector(".slide-icon i")
     const title = slide.querySelector(".slide-title")
     const text = slide.querySelector(".slide-text")
-    const listItems = slide.querySelectorAll(".slide-text li")
+    const listItems = slide.querySelectorAll(".list-item-animate")
+    const sommaireItems = slide.querySelectorAll(".sommaire-item-vertical")
+    const bottomImages = slide.querySelectorAll(".image-placeholder")
+
+    // Réinitialiser et relancer les animations pour les éléments principaux
     ;[icon, title, text].forEach((el) => {
       if (el) {
         el.style.animation = "none"
@@ -206,11 +232,28 @@ class PresentationSlider {
       }
     })
 
+    // Animer les éléments de liste avec délais
     listItems.forEach((item, index) => {
       item.style.animation = "none"
       item.offsetHeight // Trigger reflow
       item.style.animation = null
       item.style.animationDelay = `${0.5 + index * 0.1}s`
+    })
+
+    // Animer les éléments du sommaire
+    sommaireItems.forEach((item, index) => {
+      item.style.animation = "none"
+      item.offsetHeight // Trigger reflow
+      item.style.animation = null
+      item.style.animationDelay = `${0.1 + index * 0.1}s`
+    })
+
+    // Animer les images du bas
+    bottomImages.forEach((image, index) => {
+      image.style.animation = "none"
+      image.offsetHeight // Trigger reflow
+      image.style.animation = null
+      image.style.animationDelay = `${0.3 + index * 0.2}s`
     })
   }
 
@@ -236,7 +279,8 @@ class PresentationSlider {
       })
     }
 
-    document.querySelectorAll(".nav-btn, .indicator").forEach(addRippleEffect)
+    // Appliquer l'effet ripple aux nouveaux éléments
+    document.querySelectorAll(".nav-btn, .indicator, .sommaire-item-vertical").forEach(addRippleEffect)
   }
 }
 
@@ -249,11 +293,13 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.style.opacity = "1"
   }, 100)
 
-  console.log("Navigation disponible:")
+  console.log("🎯 Navigation disponible:")
   console.log("← → : Navigation entre slides")
   console.log("↑ ↓ : Scroll naturel dans le contenu")
-  console.log("1-6 : Accès direct aux slides")
+  console.log("1-9 : Accès direct aux slides")
   console.log("Molette : Scroll naturel")
   console.log("Swipe horizontal : Navigation")
   console.log("Swipe vertical : Scroll")
+  console.log("Clic sur sommaire : Navigation directe")
+  console.log("🚀 Présentation modernisée et corrigée prête !")
 })
