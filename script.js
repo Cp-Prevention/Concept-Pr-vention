@@ -3,6 +3,9 @@ class PresentationSlider {
     this.currentSlide = 1
     this.totalSlides = 9
     this.isAnimating = false
+    this.startX = 0
+    this.startY = 0
+    this.isVerticalScroll = false
 
     this.init()
   }
@@ -24,7 +27,7 @@ class PresentationSlider {
       indicator.addEventListener("click", () => this.goToSlide(index + 1))
     })
 
-    // Sommaire navigation - NOUVEAU SÉLECTEUR
+    // Sommaire navigation
     document.querySelectorAll(".sommaire-item-vertical").forEach((item) => {
       item.addEventListener("click", () => {
         const targetSlide = item.getAttribute("data-slide-target")
@@ -34,9 +37,9 @@ class PresentationSlider {
       })
     })
 
-    // Keyboard navigation - SEULEMENT pour navigation horizontale
+    // Keyboard navigation
     document.addEventListener("keydown", (e) => {
-      // Navigation horizontale SEULEMENT
+      // Navigation horizontale
       if (e.key === "ArrowLeft") {
         e.preventDefault()
         this.previousSlide()
@@ -57,29 +60,25 @@ class PresentationSlider {
         e.preventDefault()
         this.goToSlide(this.totalSlides)
       }
-
-      // LAISSER les flèches haut/bas pour le scroll naturel
-      // Ne pas intercepter ArrowUp et ArrowDown
+      if (e.key === "Escape") {
+        e.preventDefault()
+        this.goToSlide(1)
+      }
     })
 
     this.addTouchSupport()
   }
 
   addTouchSupport() {
-    let startX = 0
-    let startY = 0
-    let startTime = 0
-    let isVerticalScroll = false
-
     const slidesWrapper = document.querySelector(".slides-wrapper")
 
     slidesWrapper.addEventListener(
       "touchstart",
       (e) => {
-        startX = e.touches[0].clientX
-        startY = e.touches[0].clientY
-        startTime = Date.now()
-        isVerticalScroll = false
+        this.startX = e.touches[0].clientX
+        this.startY = e.touches[0].clientY
+        this.startTime = Date.now()
+        this.isVerticalScroll = false
       },
       { passive: true },
     )
@@ -87,18 +86,18 @@ class PresentationSlider {
     slidesWrapper.addEventListener(
       "touchmove",
       (e) => {
-        if (!startX || !startY) return
+        if (!this.startX || !this.startY) return
 
         const currentX = e.touches[0].clientX
-        const currentY = e.touches[0].currentY
+        const currentY = e.touches[0].clientY
 
-        const deltaX = Math.abs(currentX - startX)
-        const deltaY = Math.abs(currentY - startY)
+        const deltaX = Math.abs(currentX - this.startX)
+        const deltaY = Math.abs(currentY - this.startY)
 
         // Priorité au scroll vertical
-        if (deltaY > 5) {
-          isVerticalScroll = true
-          return // Laisser le scroll natif
+        if (deltaY > deltaX && deltaY > 10) {
+          this.isVerticalScroll = true
+          return
         }
       },
       { passive: true },
@@ -107,21 +106,19 @@ class PresentationSlider {
     slidesWrapper.addEventListener(
       "touchend",
       (e) => {
-        if (isVerticalScroll) {
-          startX = 0
-          startY = 0
-          isVerticalScroll = false
+        if (this.isVerticalScroll) {
+          this.resetTouch()
           return
         }
 
         const endX = e.changedTouches[0].clientX
         const endTime = Date.now()
 
-        const deltaX = endX - startX
-        const deltaTime = endTime - startTime
+        const deltaX = endX - this.startX
+        const deltaTime = endTime - this.startTime
 
         // Swipe horizontal pour navigation
-        if (Math.abs(deltaX) > 100 && deltaTime < 400) {
+        if (Math.abs(deltaX) > 50 && deltaTime < 500) {
           if (deltaX > 0) {
             this.previousSlide()
           } else {
@@ -129,12 +126,16 @@ class PresentationSlider {
           }
         }
 
-        startX = 0
-        startY = 0
-        isVerticalScroll = false
+        this.resetTouch()
       },
       { passive: true },
     )
+  }
+
+  resetTouch() {
+    this.startX = 0
+    this.startY = 0
+    this.isVerticalScroll = false
   }
 
   nextSlide() {
@@ -162,6 +163,12 @@ class PresentationSlider {
     const currentSlideElement = document.querySelector(`.slide[data-slide="${this.currentSlide}"]`)
     const targetSlideElement = document.querySelector(`.slide[data-slide="${slideNumber}"]`)
 
+    if (!currentSlideElement || !targetSlideElement) {
+      this.isAnimating = false
+      return
+    }
+
+    // Direction de l'animation
     if (slideNumber > this.currentSlide) {
       currentSlideElement.classList.add("prev")
     } else {
@@ -190,21 +197,22 @@ class PresentationSlider {
 
   updateUI() {
     const progressFill = document.getElementById("progressFill")
-    const progressPercentage = (this.currentSlide / this.totalSlides) * 100
-    progressFill.style.width = `${progressPercentage}%`
+    if (progressFill) {
+      const progressPercentage = (this.currentSlide / this.totalSlides) * 100
+      progressFill.style.width = `${progressPercentage}%`
+    }
 
     const prevBtn = document.getElementById("prevBtn")
     const nextBtn = document.getElementById("nextBtn")
 
-    prevBtn.disabled = this.currentSlide === 1
-    nextBtn.disabled = this.currentSlide === this.totalSlides
+    if (prevBtn) prevBtn.disabled = this.currentSlide === 1
+    if (nextBtn) nextBtn.disabled = this.currentSlide === this.totalSlides
 
     document.querySelectorAll(".indicator").forEach((indicator, index) => {
       indicator.classList.toggle("active", index + 1 === this.currentSlide)
     })
   }
 
-  // NOUVELLE MÉTHODE : Initialisation des animations
   initAnimations() {
     // Appliquer les délais d'animation aux éléments de liste
     document.querySelectorAll(".slide").forEach((slide) => {
@@ -216,15 +224,14 @@ class PresentationSlider {
   }
 
   animateSlideContent(slide) {
-    const icon = slide.querySelector(".slide-icon i")
-    const title = slide.querySelector(".slide-title")
-    const text = slide.querySelector(".slide-text")
-    const listItems = slide.querySelectorAll(".list-item-animate")
-    const sommaireItems = slide.querySelectorAll(".sommaire-item-vertical")
-    const bottomImages = slide.querySelectorAll(".image-placeholder")
+    const elementsToAnimate = [
+      slide.querySelector(".slide-icon i"),
+      slide.querySelector(".slide-title"),
+      slide.querySelector(".slide-text"),
+    ]
 
     // Réinitialiser et relancer les animations pour les éléments principaux
-    ;[icon, title, text].forEach((el) => {
+    elementsToAnimate.forEach((el) => {
       if (el) {
         el.style.animation = "none"
         el.offsetHeight // Trigger reflow
@@ -233,6 +240,7 @@ class PresentationSlider {
     })
 
     // Animer les éléments de liste avec délais
+    const listItems = slide.querySelectorAll(".list-item-animate")
     listItems.forEach((item, index) => {
       item.style.animation = "none"
       item.offsetHeight // Trigger reflow
@@ -241,6 +249,7 @@ class PresentationSlider {
     })
 
     // Animer les éléments du sommaire
+    const sommaireItems = slide.querySelectorAll(".sommaire-item-vertical")
     sommaireItems.forEach((item, index) => {
       item.style.animation = "none"
       item.offsetHeight // Trigger reflow
@@ -249,6 +258,7 @@ class PresentationSlider {
     })
 
     // Animer les images du bas
+    const bottomImages = slide.querySelectorAll(".image-placeholder")
     bottomImages.forEach((image, index) => {
       image.style.animation = "none"
       image.offsetHeight // Trigger reflow
@@ -279,27 +289,32 @@ class PresentationSlider {
       })
     }
 
-    // Appliquer l'effet ripple aux nouveaux éléments
+    // Appliquer l'effet ripple
     document.querySelectorAll(".nav-btn, .indicator, .sommaire-item-vertical").forEach(addRippleEffect)
   }
 }
 
+// Initialisation
 document.addEventListener("DOMContentLoaded", () => {
   const presentation = new PresentationSlider()
 
+  // Animation d'entrée
   document.body.style.opacity = "0"
   setTimeout(() => {
     document.body.style.transition = "opacity 0.5s ease"
     document.body.style.opacity = "1"
   }, 100)
 
+  // Messages de debug
   console.log("🎯 Navigation disponible:")
   console.log("← → : Navigation entre slides")
   console.log("↑ ↓ : Scroll naturel dans le contenu")
   console.log("1-9 : Accès direct aux slides")
+  console.log("Home/End : Première/Dernière slide")
+  console.log("Escape : Retour à la première slide")
   console.log("Molette : Scroll naturel")
   console.log("Swipe horizontal : Navigation")
   console.log("Swipe vertical : Scroll")
   console.log("Clic sur sommaire : Navigation directe")
-  console.log("🚀 Présentation modernisée et corrigée prête !")
+  console.log("🚀 Présentation optimisée prête !")
 })
